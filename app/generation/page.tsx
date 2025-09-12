@@ -623,8 +623,9 @@ Tip: I automatically detect and install npm packages from your code imports (lik
     } catch (error) {
       console.error('[createSandbox] Error:', error);
       updateStatus('Error', false);
-      log(`Failed to create sandbox: ${error.message}`, 'error');
-      addChatMessage(`Failed to create sandbox: ${error.message}`, 'system');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Failed to create sandbox: ${errorMessage}`, 'error');
+      addChatMessage(`Failed to create sandbox: ${errorMessage}`, 'system');
       throw error;
     } finally {
       setLoading(false);
@@ -1160,7 +1161,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
   const renderMainContent = () => {
     if (activeTab === 'generation' && (generationProgress.isGenerating || generationProgress.files.length > 0)) {
       return (
-        /* Generation Tab Content */
         <div className="absolute inset-0 flex overflow-hidden">
           {/* File Explorer - Hide during edits */}
           {!generationProgress.isEdit && (
@@ -1540,16 +1540,19 @@ Tip: I automatically detect and install npm packages from your code imports (lik
               </div>
             )}
           </div>
-        );
-      } else if (activeTab === 'preview') {
-        return (
-          <>
-            {(() => {
-              // Show loading state for initial generation or when starting a new generation with existing sandbox
-              const isInitialGeneration = !sandboxData?.url && (urlScreenshot || isCapturingScreenshot || isPreparingDesign || loadingStage);
-              const isNewGenerationWithSandbox = isStartingNewGeneration && sandboxData?.url;
-              const shouldShowLoadingOverlay = (isInitialGeneration || isNewGenerationWithSandbox) && 
-                (loading || generationProgress.isGenerating || isPreparingDesign || loadingStage || isCapturingScreenshot || isStartingNewGeneration);
+        </div>
+      );
+    }
+    
+    if (activeTab === 'preview') {
+      return (
+        <>
+          {(() => {
+            // Show loading state for initial generation or when starting a new generation with existing sandbox
+            const isInitialGeneration = !sandboxData?.url && (urlScreenshot || isCapturingScreenshot || isPreparingDesign || loadingStage);
+            const isNewGenerationWithSandbox = isStartingNewGeneration && sandboxData?.url;
+            const shouldShowLoadingOverlay = (isInitialGeneration || isNewGenerationWithSandbox) && 
+              (loading || generationProgress.isGenerating || isPreparingDesign || loadingStage || isCapturingScreenshot || isStartingNewGeneration);
               
               if (isInitialGeneration || isNewGenerationWithSandbox) {
                 return (
@@ -1726,12 +1729,11 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                 </div>
               );
             })()}
-          </div>
+          </>
         );
-      }
-    } else {
-      return null;
     }
+    
+    return null;
   };
 
   const sendChatMessage = async () => {
@@ -3682,6 +3684,3 @@ export default function Page() {
     </Suspense>
   );
 }
-```
-
-```

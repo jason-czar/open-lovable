@@ -219,7 +219,6 @@ REMEMBER: The user wants a working application they can immediately use and inte
 
 Generate all necessary React components and make sure the application is fully functional. Focus on creating a great user experience with the ${style} design style.`,
           temperature: 0.7,
-          maxTokens: 4000,
         });
         
         let generatedCode = '';
