@@ -19,7 +19,7 @@ import HomeHeroBadge from "@/components/app/(home)/sections/hero/Badge/Badge";
 import HomeHeroPixi from "@/components/app/(home)/sections/hero/Pixi/Pixi";
 import HomeHeroTitle from "@/components/app/(home)/sections/hero/Title/Title";
 import HeroInputSubmitButton from "@/components/app/(home)/sections/hero-input/Button/Button";
-// import Globe from "@/components/app/(home)/sections/hero-input/_svg/Globe";
+import AppDescriptionInput from '@/components/AppDescriptionInput';
 
 // Import header components
 import HeaderBrandKit from "@/components/shared/header/BrandKit/BrandKit";
@@ -49,6 +49,9 @@ export default function HomePage() {
   const [showSelectMessage, setShowSelectMessage] = useState<boolean>(false);
   const [showInstructionsForIndex, setShowInstructionsForIndex] = useState<number | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState<string>('');
+  const [inputMode, setInputMode] = useState<'url' | 'description'>('description');
+  const [appDescription, setAppDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
   
   // Simple URL validation
@@ -168,6 +171,24 @@ export default function HomePage() {
     }
   };
 
+  const handleAppDescriptionSubmit = async () => {
+    if (!appDescription.trim() || isGenerating) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      // Store the app description for the generation page
+      sessionStorage.setItem('appDescription', appDescription.trim());
+      sessionStorage.setItem('generationType', 'description');
+      
+      // Navigate to generation page
+      router.push('/generation');
+    } catch (error) {
+      console.error('Error starting app generation:', error);
+      setIsGenerating(false);
+    }
+  };
+
   // Perform search when user types
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery.trim() || isURL(searchQuery)) {
@@ -277,134 +298,90 @@ export default function HomePage() {
                 >
 
                 <div className="p-16 flex gap-12 items-center w-full relative bg-white rounded-20">
-                  {/* Show different UI when search results are displayed */}
-                  {hasSearched && searchResults.length > 0 && !isFadingOut ? (
-                    <>
-                      {/* Selection mode icon */}
-                      <svg 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 20 20" 
-                        fill="none" 
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="opacity-40 flex-shrink-0"
-                      >
-                        <rect x="2" y="4" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                        <rect x="11" y="4" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                        <rect x="2" y="11" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                        <rect x="11" y="11" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                      </svg>
-                      
-                      {/* Selection message */}
-                      <div className="flex-1 text-body-input text-accent-black">
-                        Select which site to clone from the results below
-                      </div>
-                      
-                      {/* Search again button */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setIsFadingOut(true);
-                          setTimeout(() => {
-                            setSearchResults([]);
-                            setHasSearched(false);
-                            setShowSearchTiles(false);
-                            setIsFadingOut(false);
-                            setUrl('');
-                          }, 500);
-                        }}
-                        className="button relative rounded-10 px-12 py-8 text-label-medium font-medium flex items-center justify-center gap-6 bg-gray-100 hover:bg-gray-200 text-gray-700 active:scale-[0.995] transition-all"
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="opacity-60"
-                        >
-                          <path d="M14 14L10 10M11 6.5C11 9 9 11 6.5 11C4 11 2 9 2 6.5C2 4 4 2 6.5 2C9 2 11 4 11 6.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                        <span>Search Again</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {isURL(url) ? (
-                        // Scrape icon for URLs
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 20 20" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="opacity-40 flex-shrink-0"
-                        >
-                          <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                          <path d="M7 10L9 12L13 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      ) : (
-                        // Search icon for search terms
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 20 20" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="opacity-40 flex-shrink-0"
-                        >
-                          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
-                          <path d="M12.5 12.5L16.5 16.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                      )}
-                      <input
-                        className="flex-1 bg-transparent text-body-input text-accent-black placeholder:text-black-alpha-48 focus:outline-none focus:ring-0 focus:border-transparent"
-                        placeholder="Enter URL or search term..."
-                        type="text"
-                        value={url}
-                        disabled={isSearching}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setUrl(value);
-                          setIsValidUrl(validateUrl(value));
-                          // Reset search state when input changes
-                          if (value.trim() === "") {
-                            setShowSearchTiles(false);
-                            setHasSearched(false);
-                            setSearchResults([]);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !isSearching) {
-                            e.preventDefault();
-                            handleSubmit();
-                          }
-                        }}
-                        onFocus={() => {
-                          if (url.trim() && !isURL(url) && searchResults.length > 0) {
-                            setShowSearchTiles(true);
-                          }
-                        }}
-                      />
-                      <div
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (!isSearching) {
-                            handleSubmit();
-                          }
-                        }}
-                        className={isSearching ? 'pointer-events-none' : ''}
-                      >
-                        <HeroInputSubmitButton 
-                          dirty={url.length > 0} 
-                          buttonText={isURL(url) ? 'Scrape Site' : 'Search'} 
-                          disabled={isSearching}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
+                  {/* Mode Toggle */}
+                  <div className="flex items-center justify-center space-x-1 bg-gray-100 rounded-lg p-1 w-fit mx-auto">
+                    <button
+                      onClick={() => setInputMode('description')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        inputMode === 'description'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Describe App
+                    </button>
+                    <button
+                      onClick={() => setInputMode('url')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        inputMode === 'url'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Clone URL
+                    </button>
+                  </div>
 
+                  {/* Input Components */}
+                  <div className="space-y-6">
+                    {inputMode === 'description' ? (
+                      <AppDescriptionInput
+                        value={appDescription}
+                        onChange={setAppDescription}
+                        onSubmit={handleAppDescriptionSubmit}
+                        placeholder="Describe the app you want to build... (e.g., 'Build a note-taking app with rich text editing')"
+                        isGenerating={isGenerating}
+                      />
+                    ) : (
+                      <div className="flex-1 text-body-input text-accent-black placeholder:text-black-alpha-48 focus:outline-none focus:ring-0 focus:border-transparent">
+                        <input
+                          className="flex-1 bg-transparent text-body-input text-accent-black placeholder:text-black-alpha-48 focus:outline-none focus:ring-0 focus:border-transparent"
+                          placeholder="Enter URL or search term..."
+                          type="text"
+                          value={url}
+                          disabled={isSearching}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setUrl(value);
+                            setIsValidUrl(validateUrl(value));
+                            // Reset search state when input changes
+                            if (value.trim() === "") {
+                              setShowSearchTiles(false);
+                              setHasSearched(false);
+                              setSearchResults([]);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !isSearching) {
+                              e.preventDefault();
+                              handleSubmit();
+                            }
+                          }}
+                          onFocus={() => {
+                            if (url.trim() && !isURL(url) && searchResults.length > 0) {
+                              setShowSearchTiles(true);
+                            }
+                          }}
+                        />
+                        <div
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (!isSearching) {
+                              handleSubmit();
+                            }
+                          }}
+                          className={isSearching ? 'pointer-events-none' : ''}
+                        >
+                          <HeroInputSubmitButton 
+                            dirty={url.length > 0} 
+                            buttonText={isURL(url) ? 'Scrape Site' : 'Search'} 
+                            disabled={isSearching}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Options Section - Only show when valid URL */}
                 <div className={`overflow-hidden transition-all duration-500 ease-in-out ${
