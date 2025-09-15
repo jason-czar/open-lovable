@@ -10,6 +10,9 @@ export interface ConversationMessage {
     addedPackages?: string[]; // Packages added in this interaction
     editType?: string; // Type of edit performed
     sandboxId?: string; // Sandbox ID at time of message
+    isFollowUp?: boolean; // Whether this is a follow-up to previous generation
+    parentMessageId?: string; // ID of the message this follows up on
+    codeSnapshot?: string; // Snapshot of code at this point
   };
 }
 

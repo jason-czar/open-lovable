@@ -262,7 +262,7 @@ function parseAIResponse(response: string): ParsedResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const { response, isEdit = false, packages = [], sandboxId } = await request.json();
+    const { response, isEdit = false, packages = [], sandboxId, isFollowUp = false } = await request.json();
     
     if (!response) {
       return NextResponse.json({
@@ -275,6 +275,7 @@ export async function POST(request: NextRequest) {
     console.log('[apply-ai-code-stream] Response length:', response.length);
     console.log('[apply-ai-code-stream] Response preview:', response.substring(0, 500));
     console.log('[apply-ai-code-stream] isEdit:', isEdit);
+    console.log('[apply-ai-code-stream] isFollowUp:', isFollowUp);
     console.log('[apply-ai-code-stream] packages:', packages);
     
     // Parse the AI response
@@ -673,7 +674,9 @@ export async function POST(request: NextRequest) {
           results,
           explanation: parsed.explanation,
           structure: parsed.structure,
-          message: `Successfully applied ${results.filesCreated.length} files`
+          message: isFollowUp 
+            ? `Successfully applied refinements to ${results.filesCreated.length + results.filesUpdated.length} files`
+            : `Successfully applied ${results.filesCreated.length} files`
         });
         
         // Track applied files in conversation state

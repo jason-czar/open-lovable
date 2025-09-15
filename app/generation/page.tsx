@@ -13,8 +13,13 @@ import CodeApplicationProgress, { CodeApplicationState } from "@/components/Code
 import HMRErrorDetector from "@/components/HMRErrorDetector";
 import { AIConfigPanel } from "@/components/ai-config/AIConfigPanel";
 import { AIModelSelector } from "@/components/ai-config/AIModelSelector";
+import ConversationHistory from "@/components/ConversationHistory";
+import FollowUpInput from "@/components/FollowUpInput";
+import ConversationSummary from "@/components/ConversationSummary";
 import Button from "@/components/ui/shadcn/button";
 import { appConfig } from "@/config/app.config";
+import { ConversationManager } from "@/lib/conversation-manager";
+import { ConversationMessage } from "@/types/conversation";
 
 interface GenerationMessage {
   id: string;
@@ -44,6 +49,11 @@ export default function GenerationPage() {
   const [inputValue, setInputValue] = useState("");
   const [generationType, setGenerationType] = useState<'url' | 'description'>('description');
   
+  // Conversation state
+  const [conversationId, setConversationId] = useState<string>("");
+  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+  const [isProcessingFollowUp, setIsProcessingFollowUp] = useState(false);
+  
   // UI state
   const [errors, setErrors] = useState<Array<{ type: string; message: string; package?: string }>>([]);
 
@@ -53,6 +63,11 @@ export default function GenerationPage() {
     const appDescription = sessionStorage.getItem('appDescription');
     const storedGenerationType = sessionStorage.getItem('generationType');
     const autoStart = sessionStorage.getItem('autoStart');
+    
+    // Initialize conversation
+    const conversationManager = ConversationManager.getInstance();
+    const conversation = conversationManager.createConversation();
+    setConversationId(conversation.conversationId);
     
     if (storedGenerationType) {
       setGenerationType(storedGenerationType as 'url' | 'description');
@@ -113,6 +128,22 @@ export default function GenerationPage() {
       timestamp: Date.now()
     };
     setMessages(prev => [...prev, newMessage]);
+    
+    // Also add to conversation manager if it's user or assistant message
+    if (conversationId && (message.type === 'user' || message.type === 'assistant')) {
+      const conversationManager = ConversationManager.getInstance();
+      conversationManager.addMessage(conversationId, {
+        role: message.type === 'user' ? 'user' : 'assistant',
+        content: message.content,
+        metadata: message.metadata
+      });
+      
+      // Update conversation messages for display
+      const conversation = conversationManager.getConversation(conversationId);
+      if (conversation) {
+        setConversationMessages(conversation.context.messages);
+      }
+    }
   };
 
   const handleGenerate = async (prompt: string) => {
@@ -185,7 +216,8 @@ export default function GenerationPage() {
                     metadata: { 
                       usage: data.usage,
                       finishReason: data.finishReason,
-                      aiConfig: aiConfig
+                      aiConfig: aiConfig,
+                      isFollowUp: false
                     }
                   });
                   
@@ -210,6 +242,99 @@ export default function GenerationPage() {
       toast.error('Failed to generate code');
     } finally {
       setIsGenerating(false);
+      setCodeApplicationState({ stage: null });
+    }
+  };
+
+  const handleFollowUp = async (parentMessageId: string, instruction: string) => {
+    if (!instruction.trim() || isProcessingFollowUp) return;
+    
+    setIsProcessingFollowUp(true);
+    setCodeApplicationState({ stage: 'analyzing' });
+    
+    // Add user follow-up message
+    addMessage({
+      type: 'user',
+      content: instruction,
+      metadata: {
+        isFollowUp: true,
+        parentMessageId
+      }
+    });
+
+    try {
+      const response = await fetch('/api/generate-follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          followUpInstruction: instruction,
+          parentMessageId,
+          conversationId,
+          model: selectedModel,
+          aiConfig,
+          sandboxId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let generatedCode = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'chunk') {
+                  generatedCode += data.content || '';
+                } else if (data.type === 'complete') {
+                  generatedCode = data.content || generatedCode;
+                  
+                  addMessage({
+                    type: 'assistant',
+                    content: generatedCode,
+                    metadata: { 
+                      usage: data.usage,
+                      finishReason: data.finishReason,
+                      aiConfig,
+                      isFollowUp: true,
+                      parentMessageId
+                    }
+                  });
+                  
+                  // Apply the follow-up changes
+                  await applyGeneratedCode(generatedCode);
+                } else if (data.type === 'error') {
+                  throw new Error(data.error || 'Follow-up generation failed');
+                }
+              } catch (parseError) {
+                console.debug('Error parsing follow-up stream data:', parseError);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Follow-up generation error:', error);
+      addMessage({
+        type: 'system',
+        content: `Follow-up error: ${(error as Error).message}`
+      });
+      toast.error('Failed to process follow-up instruction');
+    } finally {
+      setIsProcessingFollowUp(false);
       setCodeApplicationState({ stage: null });
     }
   };
@@ -393,61 +518,104 @@ export default function GenerationPage() {
             )}
           </AnimatePresence>
 
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-24 space-y-16">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "p-12 rounded-8 text-body-small",
-                  message.type === 'user' && "bg-heat-4 text-accent-black ml-16",
-                  message.type === 'assistant' && "bg-black-alpha-4 text-accent-black mr-16",
-                  message.type === 'system' && "bg-blue-50 text-blue-800 text-center",
-                  message.type === 'command' && "bg-gray-100 text-gray-600 font-mono"
-                )}
-              >
-                <div className="whitespace-pre-wrap break-words">
-                  {message.content}
-                </div>
-                {message.metadata?.usage && (
-                  <div className="mt-8 pt-8 border-t border-black-alpha-8 text-body-small text-black-alpha-56">
-                    Tokens: {message.metadata.usage.totalTokens} • Model: {selectedModel}
-                  </div>
-                )}
+          {/* Conversation History */}
+          <div className="flex-1 overflow-y-auto p-24">
+            {/* Conversation Summary */}
+            {conversationMessages.length > 0 && (
+              <div className="mb-16">
+                <ConversationSummary messages={conversationMessages} />
               </div>
-            ))}
+            )}
             
-            <CodeApplicationProgress state={codeApplicationState} />
+            <ConversationHistory
+              messages={conversationMessages}
+              onFollowUp={handleFollowUp}
+            />
+            
+            {/* System messages and progress */}
+            <div className="space-y-8 mt-16">
+              {messages.filter(m => m.type === 'system' || m.type === 'command').map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "p-12 rounded-8 text-body-small",
+                    message.type === 'system' && "bg-blue-50 text-blue-800 text-center",
+                    message.type === 'command' && "bg-gray-100 text-gray-600 font-mono"
+                  )}
+                >
+                  <div className="whitespace-pre-wrap break-words">
+                    {message.content}
+                  </div>
+                </div>
+              ))}
+              
+              <CodeApplicationProgress state={codeApplicationState} />
+            </div>
           </div>
 
           {/* Input Area */}
           <div className="p-24 border-t border-border-faint">
-            <HeroInput
-              value={inputValue}
-              onChange={setInputValue}
-              onSubmit={() => handleGenerate(inputValue)}
-              placeholder={
-                generationType === 'description' 
-                  ? "Describe the app you want to build..."
-                  : "Enter URL to reimagine..."
-              }
-              showSearchFeatures={false}
-              className="mb-12"
-            />
+            {conversationMessages.length > 0 ? (
+              <FollowUpInput
+                onSubmit={(instruction) => {
+                  const lastAssistantMessage = conversationMessages
+                    .filter(m => m.role === 'assistant')
+                    .pop();
+                  
+                  if (lastAssistantMessage) {
+                    handleFollowUp(lastAssistantMessage.id, instruction);
+                  }
+                }}
+                isProcessing={isProcessingFollowUp}
+                className="mb-12"
+              />
+            ) : (
+              <HeroInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={() => handleGenerate(inputValue)}
+                placeholder={
+                  generationType === 'description' 
+                    ? "Describe the app you want to build..."
+                    : "Enter URL to reimagine..."
+                }
+                showSearchFeatures={false}
+                className="mb-12"
+              />
+            )}
             
             {/* Generation Controls */}
             <div className="flex items-center gap-8">
               <Button
-                variant={isGenerating ? "secondary" : "primary"}
+                variant={isGenerating || isProcessingFollowUp ? "secondary" : "primary"}
                 size="default"
-                onClick={() => isGenerating ? setIsGenerating(false) : handleGenerate(inputValue)}
-                disabled={!inputValue.trim()}
+                onClick={() => {
+                  if (isGenerating || isProcessingFollowUp) {
+                    setIsGenerating(false);
+                    setIsProcessingFollowUp(false);
+                  } else if (conversationMessages.length > 0) {
+                    // Start new conversation
+                    const conversationManager = ConversationManager.getInstance();
+                    const newConversation = conversationManager.createConversation();
+                    setConversationId(newConversation.conversationId);
+                    setConversationMessages([]);
+                    setMessages([]);
+                  } else {
+                    handleGenerate(inputValue);
+                  }
+                }}
+                disabled={!inputValue.trim() && conversationMessages.length === 0}
                 className="flex-1 gap-6"
               >
-                {isGenerating ? (
+                {isGenerating || isProcessingFollowUp ? (
                   <>
                     <Square className="w-16 h-16" />
                     Stop
+                  </>
+                ) : conversationMessages.length > 0 ? (
+                  <>
+                    <RefreshCw className="w-16 h-16" />
+                    New Project
                   </>
                 ) : (
                   <>
@@ -464,7 +632,7 @@ export default function GenerationPage() {
                 className="gap-6"
               >
                 <RefreshCw className="w-16 h-16" />
-                Reset
+                Reset Sandbox
               </Button>
             </div>
           </div>

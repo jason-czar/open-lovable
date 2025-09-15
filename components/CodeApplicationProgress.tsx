@@ -7,6 +7,7 @@ export interface CodeApplicationState {
   installedPackages?: string[];
   filesGenerated?: string[];
   message?: string;
+  isFollowUp?: boolean;
 }
 
 interface CodeApplicationProgressProps {
@@ -50,7 +51,7 @@ export default function CodeApplicationProgress({ state }: CodeApplicationProgre
 
           {/* Simple loading text */}
           <div className="text-sm font-medium text-gray-700">
-            Applying to sandbox...
+            {state.isFollowUp ? 'Applying refinements...' : 'Applying to sandbox...'}
           </div>
         </div>
       </motion.div>
