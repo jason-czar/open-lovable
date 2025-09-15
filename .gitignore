@@ -60,3 +60,4 @@ bun.lockb
 
 # API keys and sensitive files
 env.txt
+.env
