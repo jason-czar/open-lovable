@@ -40,6 +40,7 @@ export default function HomePage() {
   const [url, setUrl] = useState<string>("");
   const [selectedStyle, setSelectedStyle] = useState<string>("1");
   const [selectedModel, setSelectedModel] = useState<string>(appConfig.ai.defaultModel);
+  const [aiConfig, setAiConfig] = useState<any>({});
   const [isValidUrl, setIsValidUrl] = useState<boolean>(false);
   const [showSearchTiles, setShowSearchTiles] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -101,6 +102,7 @@ export default function HomePage() {
         sessionStorage.setItem('targetUrl', selectedResult.url);
         sessionStorage.setItem('selectedStyle', selectedStyle);
         sessionStorage.setItem('selectedModel', selectedModel);
+        sessionStorage.setItem('aiConfig', JSON.stringify(aiConfig));
         sessionStorage.setItem('autoStart', 'true');
         if (selectedResult.markdown) {
           sessionStorage.setItem('siteMarkdown', selectedResult.markdown);
@@ -115,6 +117,7 @@ export default function HomePage() {
       sessionStorage.setItem('targetUrl', inputValue);
       sessionStorage.setItem('selectedStyle', selectedStyle);
       sessionStorage.setItem('selectedModel', selectedModel);
+      sessionStorage.setItem('aiConfig', JSON.stringify(aiConfig));
       sessionStorage.setItem('autoStart', 'true');
       router.push('/generation');
     } else {
@@ -180,6 +183,8 @@ export default function HomePage() {
       // Store the app description for the generation page
       sessionStorage.setItem('appDescription', appDescription.trim());
       sessionStorage.setItem('generationType', 'description');
+      sessionStorage.setItem('selectedModel', selectedModel);
+      sessionStorage.setItem('aiConfig', JSON.stringify(aiConfig));
       
       // Navigate to generation page
       router.push('/generation');

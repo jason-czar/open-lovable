@@ -85,6 +85,24 @@ export const appConfig = {
     
     // Max tokens for truncation recovery
     truncationRecoveryMaxTokens: 4000,
+    
+    // Advanced AI configuration
+    enableAdvancedConfig: true,
+    
+    // Parameter ranges for safety
+    parameterLimits: {
+      temperature: { min: 0, max: 2 },
+      topP: { min: 0, max: 1 },
+      maxTokens: { min: 100, max: 16384 }
+    },
+    
+    // Default configurations for different use cases
+    defaultConfigs: {
+      balanced: { temperature: 0.7, topP: 0.9, maxTokens: 8000 },
+      creative: { temperature: 0.9, topP: 0.95, maxTokens: 8000 },
+      precise: { temperature: 0.3, topP: 0.8, maxTokens: 8000 },
+      codeFocused: { temperature: 0.2, topP: 0.85, maxTokens: 12000 }
+    }
   },
   
   // Code Application Configuration
